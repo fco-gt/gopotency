@@ -33,7 +33,7 @@ type Config struct {
 
 	// ErrorHandler is called when an error occurs, allowing custom error responses
 	// Default: returns standard error responses
-	ErrorHandler func(error) (statusCode int, body interface{})
+	ErrorHandler func(error) (statusCode int, body any)
 
 	// OnCacheHit is called when a cached response is returned (optional)
 	OnCacheHit func(key string)
