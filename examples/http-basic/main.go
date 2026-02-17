@@ -6,9 +6,9 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/fco-gt/idempotency-go"
-	httpmw "github.com/fco-gt/idempotency-go/middleware/http"
-	"github.com/fco-gt/idempotency-go/storage/memory"
+	"github.com/fco-gt/gopotency"
+	httpmw "github.com/fco-gt/gopotency/middleware/http"
+	"github.com/fco-gt/gopotency/storage/memory"
 )
 
 type PaymentRequest struct {

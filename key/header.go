@@ -1,7 +1,7 @@
 // Package key provides strategies for generating idempotency keys from HTTP requests
 package key
 
-import "github.com/fco-gt/idempotency-go"
+import "github.com/fco-gt/gopotency"
 
 // HeaderBased creates a key generator that extracts the key from a request header
 func HeaderBased(headerName string) idempotency.KeyGenerator {

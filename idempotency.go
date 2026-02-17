@@ -10,8 +10,8 @@
 // Create a manager with in-memory storage:
 //
 //	import (
-//		"github.com/franciscoRdiaz/idempotenci-go"
-//		"github.com/franciscoRdiaz/idempotenci-go/storage/memory"
+//		"github.com/fco-gt/gopotency"
+//		"github.com/fco-gt/gopotency/storage/memory"
 //		"time"
 //	)
 //
@@ -23,14 +23,14 @@
 //
 // Use with Gin:
 //
-//	import ginmw "github.com/franciscoRdiaz/idempotenci-go/middleware/gin"
+//	import ginmw "github.com/fco-gt/gopotency/middleware/gin"
 //
 //	router := gin.Default()
 //	router.Use(ginmw.Idempotency(manager))
 //
 // Use with standard library:
 //
-//	import httpmw "github.com/franciscoRdiaz/idempotenci-go/middleware/http"
+//	import httpmw "github.com/fco-gt/gopotency/middleware/http"
 //
 //	mux := http.NewServeMux()
 //	handler := httpmw.Idempotency(manager)(yourHandler)

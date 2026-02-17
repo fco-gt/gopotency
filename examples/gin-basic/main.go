@@ -4,9 +4,9 @@ import (
 	"log"
 	"time"
 
-	"github.com/fco-gt/idempotency-go"
-	ginmw "github.com/fco-gt/idempotency-go/middleware/gin"
-	"github.com/fco-gt/idempotency-go/storage/memory"
+	"github.com/fco-gt/gopotency"
+	ginmw "github.com/fco-gt/gopotency/middleware/gin"
+	"github.com/fco-gt/gopotency/storage/memory"
 	"github.com/gin-gonic/gin"
 )
 

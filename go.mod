@@ -1,4 +1,4 @@
-module github.com/fco-gt/idempotency-go
+module github.com/fco-gt/gopotency
 
 go 1.25.6
 
@@ -32,3 +32,6 @@ require (
 	google.golang.org/protobuf v1.34.1 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
+
+// For local development
+replace github.com/fco-gt/gopotency => ./

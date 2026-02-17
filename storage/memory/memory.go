@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/fco-gt/idempotency-go"
+	"github.com/fco-gt/gopotency"
 )
 
 // Storage is an in-memory implementation of idempotency.Storage

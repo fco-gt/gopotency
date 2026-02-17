@@ -5,7 +5,7 @@ import (
 	"encoding/hex"
 	"fmt"
 
-	"github.com/fco-gt/idempotency-go"
+	"github.com/fco-gt/gopotency"
 )
 
 // BodyHash creates a key generator that generates a key from the request body hash

@@ -5,7 +5,7 @@ import (
 	"encoding/hex"
 	"fmt"
 
-	"github.com/fco-gt/idempotency-go"
+	"github.com/fco-gt/gopotency"
 )
 
 // Composite creates a key generator that combines header-based key with request hash

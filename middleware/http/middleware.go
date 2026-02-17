@@ -6,7 +6,7 @@ import (
 	"io"
 	"net/http"
 
-	"github.com/fco-gt/idempotency-go"
+	"github.com/fco-gt/gopotency"
 )
 
 // Idempotency returns an HTTP middleware that handles idempotency

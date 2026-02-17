@@ -9,7 +9,7 @@ import (
 	"encoding/hex"
 	"fmt"
 
-	"github.com/fco-gt/idempotency-go"
+	"github.com/fco-gt/gopotency"
 )
 
 // BodyHasher creates a request hasher that hashes the request body
