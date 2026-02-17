@@ -1,5 +1,8 @@
 # GoPotency
 
+[![Go Version](https://img.shields.io/github/go-mod/go-version/fco-gt/gopotency)](https://golang.org/)
+[![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+
 A flexible, framework-agnostic Go package for handling idempotency in HTTP APIs.
 
 ## 🎯 Features
