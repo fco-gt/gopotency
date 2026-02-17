@@ -2,6 +2,7 @@ package idempotency
 
 import (
 	"context"
+	"slices"
 	"time"
 )
 
@@ -191,13 +192,7 @@ func (m *Manager) IsMethodAllowed(method string) bool {
 		return false
 	}
 
-	for _, allowed := range m.config.AllowedMethods {
-		if allowed == method {
-			return true
-		}
-	}
-
-	return false
+	return slices.Contains(m.config.AllowedMethods, method)
 }
 
 // Close closes the manager and underlying storage
