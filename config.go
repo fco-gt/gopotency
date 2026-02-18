@@ -2,6 +2,8 @@ package idempotency
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"time"
 )
 
@@ -58,6 +60,10 @@ func (c *Config) setDefaults() {
 	if c.AllowedMethods == nil {
 		c.AllowedMethods = []string{"POST", "PUT", "PATCH", "DELETE"}
 	}
+
+	if c.RequestHasher == nil {
+		c.RequestHasher = &defaultRequestHasher{}
+	}
 }
 
 // validate checks if the configuration is valid
@@ -105,4 +111,16 @@ type KeyStrategy interface {
 type RequestHasher interface {
 	// Hash computes a hash of the request for validation
 	Hash(req *Request) (string, error)
+}
+
+// defaultRequestHasher is the default implementation of RequestHasher that hashes the body
+type defaultRequestHasher struct{}
+
+func (d *defaultRequestHasher) Hash(req *Request) (string, error) {
+	if len(req.Body) == 0 {
+		return "", nil
+	}
+
+	hash := sha256.Sum256(req.Body)
+	return hex.EncodeToString(hash[:]), nil
 }
