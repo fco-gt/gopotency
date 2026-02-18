@@ -33,8 +33,8 @@ func NewManager(config Config) (*Manager, error) {
 func (m *Manager) Check(ctx context.Context, req *Request) (*CachedResponse, error) {
 	// Generate idempotency key if not already set
 	if req.IdempotencyKey == "" {
-		if m.config.KeyGenerator != nil {
-			key, err := m.config.KeyGenerator.Generate(req)
+		if m.config.KeyStrategy != nil {
+			key, err := m.config.KeyStrategy.Generate(req)
 			if err != nil {
 				return nil, err
 			}

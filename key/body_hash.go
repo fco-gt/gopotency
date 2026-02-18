@@ -5,12 +5,12 @@ import (
 	"encoding/hex"
 	"fmt"
 
-	"github.com/fco-gt/gopotency"
+	idempotency "github.com/fco-gt/gopotency"
 )
 
-// BodyHash creates a key generator that generates a key from the request body hash
+// BodyHash creates a key strategy that generates a key from the request body hash
 // The key is computed as: SHA256(method + path + body)
-func BodyHash() idempotency.KeyGenerator {
+func BodyHash() idempotency.KeyStrategy {
 	return &bodyHashGenerator{}
 }
 

@@ -40,7 +40,7 @@ func main() {
     store := memory.NewMemoryStorage()
     
     // Create idempotency manager
-    manager := idempotency.NewManager(idempotency.Config{
+    manager, _ := idempotency.NewManager(idempotency.Config{
         Storage: store,
         TTL:     24 * time.Hour,
     })
@@ -64,9 +64,9 @@ func main() {
 package main
 
 import (
-    "github.com/franciscoRdiaz/idempotenci-go"
-    "github.com/franciscoRdiaz/idempotenci-go/middleware/http"
-    "github.com/franciscoRdiaz/idempotenci-go/storage/memory"
+    "github.com/fco-gt/gopotency"
+    "github.com/fco-gt/gopotency/middleware/http"
+    "github.com/fco-gt/gopotency/storage/memory"
     "net/http"
     "time"
 )
@@ -76,7 +76,7 @@ func main() {
     store := memory.NewMemoryStorage()
     
     // Create idempotency manager
-    manager := idempotency.NewManager(idempotency.Config{
+    manager, _ := idempotency.NewManager(idempotency.Config{
         Storage: store,
         TTL:     24 * time.Hour,
     })
@@ -100,7 +100,7 @@ func main() {
 ```go
 type Config struct {
     // Storage backend (required)
-    Storage storage.Storage
+    Storage Storage
     
     // TTL for idempotency records (default: 24h)
     TTL time.Duration
@@ -110,7 +110,7 @@ type Config struct {
     
     // Key strategy: how to generate idempotency keys
     // Default: HeaderBased("Idempotency-Key")
-    KeyStrategy key.Generator
+    KeyStrategy KeyStrategy
     
     // Only apply to specific HTTP methods
     // Default: ["POST", "PUT", "PATCH", "DELETE"]
@@ -126,7 +126,7 @@ type Config struct {
 #### In-Memory (Development/Testing)
 
 ```go
-import "github.com/franciscoRdiaz/idempotenci-go/storage/memory"
+import "github.com/fco-gt/gopotency/storage/memory"
 
 store := memory.NewMemoryStorage()
 ```
@@ -135,7 +135,7 @@ store := memory.NewMemoryStorage()
 
 ```go
 import (
-    "github.com/franciscoRdiaz/idempotenci-go/storage/redis"
+    "github.com/fco-gt/gopotency/storage/redis"
     "github.com/redis/go-redis/v9"
 )
 
@@ -156,6 +156,8 @@ store := redis.NewRedisStorage(client, redis.Options{
 Client sends `Idempotency-Key` header:
 
 ```go
+import "github.com/fco-gt/gopotency/key"
+
 config := idempotency.Config{
     Storage:     store,
     KeyStrategy: key.HeaderBased("Idempotency-Key"),
@@ -167,7 +169,7 @@ config := idempotency.Config{
 Generates key from request content (method + path + body):
 
 ```go
-import "github.com/franciscoRdiaz/idempotenci-go/key"
+import "github.com/fco-gt/gopotency/key"
 
 config := idempotency.Config{
     Storage:     store,
@@ -202,12 +204,12 @@ config := idempotency.Config{
 
 ## 📊 How It Works
 
-1. **Request arrives** with `Idempotency-Key` header
-2. **Check storage** for existing record
-3. **Three scenarios**:
-   - ✅ **Completed**: Return cached response immediately
-   - ⏳ **Pending**: Return 409 Conflict (request already in progress)
-   - 🆕 **New**: Acquire lock, process request, store response
+1.  **Request arrives** with `Idempotency-Key` header
+2.  **Check storage** for existing record
+3.  **Three scenarios**:
+    -   ✅ **Completed**: Return cached response immediately
+    -   ⏳ **Pending**: Return 409 Conflict (request already in progress)
+    -   🆕 **New**: Acquire lock, process request, store response
 
 ## 🤝 Contributing
 
@@ -226,6 +228,5 @@ Inspired by idempotency implementations from Stripe, PayPal, and other leading A
 Check the [examples](./examples) directory for more use cases:
 
 - [Gin Basic](./examples/gin-basic) - Simple Gin integration
-- [Gin Redis](./examples/gin-redis) - Production setup with Redis
 - [HTTP Basic](./examples/http-basic) - Standard library usage
 - [Custom Storage](./examples/custom-storage) - Implementing custom storage backend

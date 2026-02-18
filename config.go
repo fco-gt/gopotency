@@ -19,9 +19,9 @@ type Config struct {
 	// Default: 5 minutes
 	LockTimeout time.Duration
 
-	// KeyGenerator is the strategy for generating idempotency keys
+	// KeyStrategy is the strategy for generating idempotency keys
 	// Default: HeaderBased("Idempotency-Key")
-	KeyGenerator KeyGenerator
+	KeyStrategy KeyStrategy
 
 	// RequestHasher computes a hash of the request for validation
 	// Default: BodyHasher
@@ -94,8 +94,8 @@ type Storage interface {
 	Close() error
 }
 
-// KeyGenerator is the interface for generating idempotency keys
-type KeyGenerator interface {
+// KeyStrategy is the interface for generating idempotency keys
+type KeyStrategy interface {
 	// Generate generates an idempotency key from the request
 	// Returns empty string if no key can be generated
 	Generate(req *Request) (string, error)

@@ -5,12 +5,12 @@ import (
 	"encoding/hex"
 	"fmt"
 
-	"github.com/fco-gt/gopotency"
+	idempotency "github.com/fco-gt/gopotency"
 )
 
-// Composite creates a key generator that combines header-based key with request hash
+// Composite creates a key strategy that combines header-based key with request hash
 // If header is present, uses it; otherwise falls back to body hash
-func Composite(headerName string) idempotency.KeyGenerator {
+func Composite(headerName string) idempotency.KeyStrategy {
 	return &compositeGenerator{
 		headerName: headerName,
 	}
