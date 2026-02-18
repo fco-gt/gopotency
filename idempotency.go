@@ -46,8 +46,7 @@
 // # Storage Backends
 //
 //   - memory: In-memory storage (development/testing)
-//   - redis: Redis-backed storage (production)
-//   - postgres: PostgreSQL-backed storage (production with persistence)
+//   - redis: Redis-backed storage (coming soon)
 //
 // # Configuration
 //
@@ -57,7 +56,7 @@
 //		Storage:        store,
 //		TTL:            24 * time.Hour,
 //		LockTimeout:    5 * time.Minute,
-//		KeyGenerator:   key.HeaderBased("Idempotency-Key"),
+//		KeyStrategy:    key.HeaderBased("Idempotency-Key"),
 //		AllowedMethods: []string{"POST", "PUT", "PATCH", "DELETE"},
 //	}
 package idempotency

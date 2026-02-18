@@ -2,6 +2,5 @@
 //
 // Available implementations:
 //   - memory: In-memory storage (development/testing)
-//   - redis: Redis-backed storage (production)
-//   - postgres: PostgreSQL-backed storage (production with persistence)
+//   - redis: Redis-backed storage (coming soon)
 package storage

@@ -8,7 +8,7 @@ A flexible, framework-agnostic Go package for handling idempotency in HTTP APIs.
 ## 🎯 Features
 
 - ✅ **Framework Agnostic**: Works with Gin, standard `net/http`, Echo, and more
-- ✅ **Multiple Storage Backends**: In-memory, Redis, PostgreSQL support
+- ✅ **Multiple Storage Backends**: In-memory (Redis coming soon)
 - ✅ **Flexible Key Strategies**: Header-based or auto-generated from request content
 - ✅ **Thread-Safe**: Built for concurrent environments
 - ✅ **Configurable**: Extensive options for TTL, lock timeouts, and more
@@ -40,10 +40,13 @@ func main() {
     store := memory.NewMemoryStorage()
     
     // Create idempotency manager
-    manager, _ := idempotency.NewManager(idempotency.Config{
+    manager, err := idempotency.NewManager(idempotency.Config{
         Storage: store,
         TTL:     24 * time.Hour,
     })
+    if err != nil {
+        panic(err)
+    }
     
     // Setup Gin router
     router := gin.Default()
@@ -76,10 +79,13 @@ func main() {
     store := memory.NewMemoryStorage()
     
     // Create idempotency manager
-    manager, _ := idempotency.NewManager(idempotency.Config{
+    manager, err := idempotency.NewManager(idempotency.Config{
         Storage: store,
         TTL:     24 * time.Hour,
     })
+    if err != nil {
+        panic(err)
+    }
     
     // Wrap your handler
     mux := http.NewServeMux()
@@ -117,7 +123,12 @@ type Config struct {
     AllowedMethods []string
     
     // Custom error handler (optional)
-    ErrorHandler func(error) (int, interface{})
+    ErrorHandler func(error) (int, any)
+
+    // Events (optional)
+    OnCacheHit     func(key string)
+    OnCacheMiss    func(key string)
+    OnLockConflict func(key string)
 }
 ```
 
@@ -131,22 +142,10 @@ import "github.com/fco-gt/gopotency/storage/memory"
 store := memory.NewMemoryStorage()
 ```
 
-#### Redis (Production)
+#### Redis (Coming Soon)
 
 ```go
-import (
-    "github.com/fco-gt/gopotency/storage/redis"
-    "github.com/redis/go-redis/v9"
-)
-
-client := redis.NewClient(&redis.Options{
-    Addr: "localhost:6379",
-})
-
-store := redis.NewRedisStorage(client, redis.Options{
-    KeyPrefix:  "idempotency:",
-    DefaultTTL: 24 * time.Hour,
-})
+// Support for Redis is planned for future versions
 ```
 
 ### Key Strategies
@@ -184,7 +183,7 @@ config := idempotency.Config{
 ```go
 config := idempotency.Config{
     Storage: store,
-    ErrorHandler: func(err error) (int, interface{}) {
+    ErrorHandler: func(err error) (int, any) {
         return 500, map[string]string{
             "error": err.Error(),
         }
@@ -204,9 +203,10 @@ config := idempotency.Config{
 
 ## 📊 How It Works
 
-1.  **Request arrives** with `Idempotency-Key` header
-2.  **Check storage** for existing record
-3.  **Three scenarios**:
+1.  **Request arrives**
+2.  **Generate key** using the configured `KeyStrategy`
+3.  **Check storage** for existing record
+4.  **Three scenarios**:
     -   ✅ **Completed**: Return cached response immediately
     -   ⏳ **Pending**: Return 409 Conflict (request already in progress)
     -   🆕 **New**: Acquire lock, process request, store response
@@ -217,7 +217,7 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## 📄 License
 
-MIT License - see LICENSE file for details
+MIT License - see [LICENSE](LICENSE) file for details
 
 ## 🙏 Acknowledgments
 
@@ -229,4 +229,3 @@ Check the [examples](./examples) directory for more use cases:
 
 - [Gin Basic](./examples/gin-basic) - Simple Gin integration
 - [HTTP Basic](./examples/http-basic) - Standard library usage
-- [Custom Storage](./examples/custom-storage) - Implementing custom storage backend
