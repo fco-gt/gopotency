@@ -1,0 +1,32 @@
+name: Go CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  test:
+    name: Test and Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: "go.mod"
+          cache: true
+
+      - name: Install dependencies
+        run: go mod download
+
+      - name: Run tests with race detector
+        run: go test -v -race ./...
+
+      - name: Verify examples build
+        run: |
+          go build -v ./examples/gin-basic/...
