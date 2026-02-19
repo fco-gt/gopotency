@@ -4,7 +4,8 @@ import (
 	"log"
 	"time"
 
-	"github.com/fco-gt/gopotency"
+	idempotency "github.com/fco-gt/gopotency"
+	"github.com/fco-gt/gopotency/key"
 	ginmw "github.com/fco-gt/gopotency/middleware/gin"
 	"github.com/fco-gt/gopotency/storage/memory"
 	"github.com/gin-gonic/gin"
@@ -17,8 +18,9 @@ func main() {
 
 	// Create idempotency manager
 	manager, err := idempotency.NewManager(idempotency.Config{
-		Storage: store,
-		TTL:     24 * time.Hour,
+		Storage:     store,
+		TTL:         24 * time.Hour,
+		KeyStrategy: key.BodyHash(),
 	})
 	if err != nil {
 		log.Fatal(err)
