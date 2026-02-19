@@ -2,6 +2,7 @@
 
 [![Go Version](https://img.shields.io/github/go-mod/go-version/fco-gt/gopotency)](https://golang.org/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![Go Tests](https://github.com/fco-gt/gopotency/actions/workflows/go-tests.yml/badge.svg)](https://github.com/fco-gt/gopotency/actions/workflows/go-tests.yml)
 
 A flexible, framework-agnostic Go package for handling idempotency in HTTP APIs.
 
@@ -38,7 +39,7 @@ import (
 func main() {
     // Create storage
     store := memory.NewMemoryStorage()
-    
+
     // Create idempotency manager
     manager, err := idempotency.NewManager(idempotency.Config{
         Storage: store,
@@ -47,16 +48,16 @@ func main() {
     if err != nil {
         panic(err)
     }
-    
+
     // Setup Gin router
     router := gin.Default()
     router.Use(ginmw.Idempotency(manager))
-    
+
     router.POST("/payment", func(c *gin.Context) {
         // Your handler logic
         c.JSON(200, gin.H{"status": "processed"})
     })
-    
+
     router.Run(":8080")
 }
 ```
@@ -77,7 +78,7 @@ import (
 func main() {
     // Create storage
     store := memory.NewMemoryStorage()
-    
+
     // Create idempotency manager
     manager, err := idempotency.NewManager(idempotency.Config{
         Storage: store,
@@ -86,15 +87,15 @@ func main() {
     if err != nil {
         panic(err)
     }
-    
+
     // Wrap your handler
     mux := http.NewServeMux()
     handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
         w.Write([]byte(`{"status": "processed"}`))
     })
-    
+
     mux.Handle("/payment", httpmw.Idempotency(manager)(handler))
-    
+
     http.ListenAndServe(":8080", mux)
 }
 ```
@@ -107,21 +108,21 @@ func main() {
 type Config struct {
     // Storage backend (required)
     Storage Storage
-    
+
     // TTL for idempotency records (default: 24h)
     TTL time.Duration
-    
+
     // Lock timeout to prevent deadlocks (default: 5m)
     LockTimeout time.Duration
-    
+
     // Key strategy: how to generate idempotency keys
     // Default: HeaderBased("Idempotency-Key")
     KeyStrategy KeyStrategy
-    
+
     // Only apply to specific HTTP methods
     // Default: ["POST", "PUT", "PATCH", "DELETE"]
     AllowedMethods []string
-    
+
     // Custom error handler (optional)
     ErrorHandler func(error) (int, any)
 
@@ -207,9 +208,9 @@ config := idempotency.Config{
 2.  **Generate key** using the configured `KeyStrategy`
 3.  **Check storage** for existing record
 4.  **Three scenarios**:
-    -   ✅ **Completed**: Return cached response immediately
-    -   ⏳ **Pending**: Return 409 Conflict (request already in progress)
-    -   🆕 **New**: Acquire lock, process request, store response
+    - ✅ **Completed**: Return cached response immediately
+    - ⏳ **Pending**: Return 409 Conflict (request already in progress)
+    - 🆕 **New**: Acquire lock, process request, store response
 
 ## 🤝 Contributing
 
