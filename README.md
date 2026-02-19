@@ -20,40 +20,36 @@ A flexible, framework-agnostic Go package for handling idempotency in HTTP APIs.
 go get github.com/fco-gt/gopotency
 ```
 
+## 🚀 Quick Start
+
+### With Gin
+
 ```go
 package main
 
 import (
     "github.com/fco-gt/gopotency"
-    "github.com/fco-gt/gopotency/middleware/gin"
+    ginmw "github.com/fco-gt/gopotency/middleware/gin"
     "github.com/fco-gt/gopotency/storage/memory"
     "github.com/gin-gonic/gin"
     "time"
 )
 
 func main() {
-    // Create storage
     store := memory.NewMemoryStorage()
-
-    // Create idempotency manager
-    manager, err := idempotency.NewManager(idempotency.Config{
+    manager, _ := idempotency.NewManager(idempotency.Config{
         Storage: store,
         TTL:     24 * time.Hour,
     })
-    if err != nil {
-        panic(err)
-    }
 
-    // Setup Gin router
-    router := gin.Default()
-    router.Use(ginmw.Idempotency(manager))
+    r := gin.Default()
+    r.Use(ginmw.Idempotency(manager))
 
-    router.POST("/payment", func(c *gin.Context) {
-        // Your handler logic
-        c.JSON(200, gin.H{"status": "processed"})
+    r.POST("/orders", func(c *gin.Context) {
+        c.JSON(201, gin.H{"order_id": "ORD-123", "status": "created"})
     })
 
-    router.Run(":8080")
+    r.Run(":8080")
 }
 ```
 
@@ -64,33 +60,25 @@ package main
 
 import (
     "github.com/fco-gt/gopotency"
-    "github.com/fco-gt/gopotency/middleware/http"
+    httpmw "github.com/fco-gt/gopotency/middleware/http"
     "github.com/fco-gt/gopotency/storage/memory"
     "net/http"
     "time"
 )
 
 func main() {
-    // Create storage
     store := memory.NewMemoryStorage()
-
-    // Create idempotency manager
-    manager, err := idempotency.NewManager(idempotency.Config{
+    manager, _ := idempotency.NewManager(idempotency.Config{
         Storage: store,
         TTL:     24 * time.Hour,
     })
-    if err != nil {
-        panic(err)
-    }
 
-    // Wrap your handler
     mux := http.NewServeMux()
     handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
         w.Write([]byte(`{"status": "processed"}`))
     })
 
-    mux.Handle("/payment", httpmw.Idempotency(manager)(handler))
-
+    mux.Handle("/process", httpmw.Idempotency(manager)(handler))
     http.ListenAndServe(":8080", mux)
 }
 ```
@@ -101,127 +89,85 @@ func main() {
 
 ```go
 type Config struct {
-    // Storage backend (required)
-    Storage Storage
-
-    // TTL for idempotency records (default: 24h)
-    TTL time.Duration
-
-    // Lock timeout to prevent deadlocks (default: 5m)
-    LockTimeout time.Duration
-
-    // Key strategy: how to generate idempotency keys
-    // Default: HeaderBased("Idempotency-Key")
-    KeyStrategy KeyStrategy
-
-    // Only apply to specific HTTP methods
-    // Default: ["POST", "PUT", "PATCH", "DELETE"]
-    AllowedMethods []string
-
-    // Custom error handler (optional)
-    ErrorHandler func(error) (int, any)
-
-    // Events (optional)
-    OnCacheHit     func(key string)
-    OnCacheMiss    func(key string)
-    OnLockConflict func(key string)
+    Storage        Storage       // Required: Memory, Redis, SQL, or GORM
+    TTL            time.Duration // Default: 24h
+    LockTimeout    time.Duration // Default: 5m
+    KeyStrategy    KeyStrategy   // Default: HeaderBased("Idempotency-Key")
+    AllowedMethods []string      // Default: ["POST", "PUT", "PATCH", "DELETE"]
+    ErrorHandler   func(error) (int, any)
 }
 ```
 
 ### Storage Backends
 
-#### In-Memory (Development/Testing)
+#### In-Memory (Dev/Single Instance)
 
 ```go
 import "github.com/fco-gt/gopotency/storage/memory"
-
 store := memory.NewMemoryStorage()
 ```
 
-#### Redis (Coming Soon)
+#### Redis (Distributed)
 
 ```go
-// Support for Redis is planned for future versions
+import "github.com/fco-gt/gopotency/storage/redis"
+store, err := redis.NewRedisStorage(ctx, "localhost:6379", "password")
 ```
 
-### Key Strategies
-
-#### Header-Based (Default)
-
-Client sends `Idempotency-Key` header:
+#### GORM (Database Agnostic)
 
 ```go
-import "github.com/fco-gt/gopotency/key"
-
-config := idempotency.Config{
-    Storage:     store,
-    KeyStrategy: key.HeaderBased("Idempotency-Key"),
-}
+import (
+    idempotencyGorm "github.com/fco-gt/gopotency/storage/gorm"
+    "gorm.io/gorm"
+)
+store := idempotencyGorm.NewGormStorage(db)
 ```
 
-#### Auto-Hash (Automatic)
-
-Generates key from request content (method + path + body):
+#### SQL (Postgres/SQLite)
 
 ```go
-import "github.com/fco-gt/gopotency/key"
-
-config := idempotency.Config{
-    Storage:     store,
-    KeyStrategy: key.BodyHash(),
-}
+import idempotencySQL "github.com/fco-gt/gopotency/storage/sql"
+store := idempotencySQL.NewSQLStorage(db, "idempotency_records")
 ```
 
-## 🔧 Advanced Usage
+## �️ Development
 
-### Custom Error Handler
+We use a `Makefile` to streamline development:
 
-```go
-config := idempotency.Config{
-    Storage: store,
-    ErrorHandler: func(err error) (int, any) {
-        return 500, map[string]string{
-            "error": err.Error(),
-        }
-    },
-}
+```bash
+make test    # Run all tests
+make bench   # Run performance benchmarks
+make build   # Build all examples
 ```
 
-### Selective Application
+## 📊 Benchmarks
 
-```go
-// Only apply to specific methods
-config := idempotency.Config{
-    Storage:        store,
-    AllowedMethods: []string{"POST", "DELETE"},
-}
-```
+GoPotency is optimized for high-performance APIs.
 
-## 📊 How It Works
-
-1.  **Request arrives**
-2.  **Generate key** using the configured `KeyStrategy`
-3.  **Check storage** for existing record
-4.  **Three scenarios**:
-    - ✅ **Completed**: Return cached response immediately
-    - ⏳ **Pending**: Return 409 Conflict (request already in progress)
-    - 🆕 **New**: Acquire lock, process request, store response
+| Operation                  | Time        |
+| :------------------------- | :---------- |
+| **Idempotency Check**      | ~520 ns/op  |
+| **Full Flow (Lock/Store)** | ~1500 ns/op |
 
 ## 🤝 Contributing
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+Contributions are what make the open source community such an amazing place to learn, inspire, and create. Any contributions you make are **greatly appreciated**.
+
+1. Fork the Project
+2. Create your Feature Branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your Changes (`git commit -m 'Add some AmazingFeature'`)
+4. Push to the Branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request
 
 ## 📄 License
 
-MIT License - see [LICENSE](LICENSE) file for details
-
-## 🙏 Acknowledgments
-
-Inspired by idempotency implementations from Stripe, PayPal, and other leading APIs.
+Distributed under the MIT License. See `LICENSE` for more information.
 
 ## 📚 Examples
 
-Check the [examples](./examples) directory for more use cases:
-
-- [Gin Basic](./examples/gin-basic) - Simple Gin integration
-- [HTTP Basic](./examples/http-basic) - Standard library usage
+- [Gin Basic](./examples/gin-basic)
+- [HTTP Basic](./examples/http-basic)
+- [Redis Basic](./examples/redis-basic)
+- [SQL Basic](./examples/sql-basic)
+- [GORM Basic](./examples/gorm-basic)
