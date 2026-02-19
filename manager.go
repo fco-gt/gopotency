@@ -49,8 +49,8 @@ func (m *Manager) Check(ctx context.Context, req *Request) (*CachedResponse, err
 
 	// Check if record exists
 	record, err := m.config.Storage.Get(ctx, req.IdempotencyKey)
-	if err != nil {
-		// No record found - this is a new request
+	if err != nil || record == nil {
+		// No record found or storage error - this is a new request
 		return nil, nil
 	}
 
@@ -146,8 +146,8 @@ func (m *Manager) Store(ctx context.Context, key string, resp *Response) error {
 
 	// Get existing record to preserve request hash
 	record, err := m.config.Storage.Get(ctx, key)
-	if err != nil {
-		// Create new record if not found
+	if err != nil || record == nil {
+		// Create new record if not found or on error
 		record = &Record{
 			Key:       key,
 			CreatedAt: time.Now(),
