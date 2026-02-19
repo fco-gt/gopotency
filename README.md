@@ -8,22 +8,17 @@ A flexible, framework-agnostic Go package for handling idempotency in HTTP APIs.
 
 ## 🎯 Features
 
-- ✅ **Framework Agnostic**: Works with Gin, standard `net/http`, Echo, and more
-- ✅ **Multiple Storage Backends**: In-memory (Redis coming soon)
-- ✅ **Flexible Key Strategies**: Header-based or auto-generated from request content
-- ✅ **Thread-Safe**: Built for concurrent environments
-- ✅ **Configurable**: Extensive options for TTL, lock timeouts, and more
-- ✅ **Production Ready**: Comprehensive testing and error handling
+- ✅ **Framework Agnostic**: Works with Gin, standard `net/http`, Echo, and more.
+- ✅ **Multiple Storage Backends**: In-memory, Redis, SQL, and **GORM** support.
+- ✅ **Database Agnostic**: Use any DB with GORM (PostgreSQL, MySQL, SQL Server, SQLite).
+- ✅ **Distributed Locking**: Built-in support for multiple instances.
+- ✅ **Production Ready**: Comprehensive testing, benchmarks, and CI/CD.
 
 ## 📦 Installation
 
 ```bash
 go get github.com/fco-gt/gopotency
 ```
-
-## 🚀 Quick Start
-
-### With Gin
 
 ```go
 package main
