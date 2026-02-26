@@ -1,8 +1,12 @@
-# GoPotency
+# GoPotency - Go Idempotency
 
 [![Go Version](https://img.shields.io/github/go-mod/go-version/fco-gt/gopotency)](https://golang.org/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Go Tests](https://github.com/fco-gt/gopotency/actions/workflows/go-tests.yml/badge.svg)](https://github.com/fco-gt/gopotency/actions/workflows/go-tests.yml)
+[![Go Report Card](https://goreportcard.com/badge/github.com/fco-gt/gopotency)](https://goreportcard.com/report/github.com/fco-gt/gopotency)
+[![Go Reference](https://pkg.go.dev/badge/github.com/fco-gt/gopotency?status.svg)](https://pkg.go.dev/github.com/fco-gt/gopotency?tab=doc)
+[![Release](https://img.shields.io/github/release/fco-gt/gopotency.svg?style=flat-square)](https://github.com/fco-gt/gopotency/releases)
+[![codecov](https://codecov.io/gh/fco-gt/gopotency/branch/master/graph/badge.svg)](https://codecov.io/gh/fco-gt/gopotency)
 
 A flexible, framework-agnostic Go package for handling idempotency in HTTP APIs.
 
