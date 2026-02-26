@@ -80,4 +80,36 @@ func TestEchoIdempotency(t *testing.T) {
 			t.Error("expected replay header")
 		}
 	})
+
+	t.Run("Conflict_InProgress", func(t *testing.T) {
+		store.Locks["echo-conflict"] = true
+		req := httptest.NewRequest("POST", "/test", bytes.NewBuffer([]byte("data")))
+		req.Header.Set("Idempotency-Key", "echo-conflict")
+		rec := httptest.NewRecorder()
+		e.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusConflict {
+			t.Errorf("expected 409, got %d", rec.Code)
+		}
+	})
+
+	t.Run("RequireKey_Failure", func(t *testing.T) {
+		m2, _ := idempotency.NewManager(idempotency.Config{
+			Storage:    store,
+			RequireKey: true,
+		})
+		e2 := echo.New()
+		e2.Use(Idempotency(m2))
+		e2.POST("/test", func(c echo.Context) error {
+			return c.String(http.StatusOK, "ok")
+		})
+
+		req := httptest.NewRequest("POST", "/test", nil)
+		rec := httptest.NewRecorder()
+		e2.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusBadRequest {
+			t.Errorf("expected 400, got %d", rec.Code)
+		}
+	})
 }
