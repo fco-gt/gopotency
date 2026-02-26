@@ -48,6 +48,9 @@ func (m *Manager) Check(ctx context.Context, req *Request) (*CachedResponse, err
 
 		// If still no key, return (idempotency not applicable)
 		if req.IdempotencyKey == "" {
+			if m.config.RequireKey && m.IsMethodAllowed(req.Method) {
+				return nil, ErrNoIdempotencyKey
+			}
 			return nil, nil
 		}
 	}
@@ -56,6 +59,12 @@ func (m *Manager) Check(ctx context.Context, req *Request) (*CachedResponse, err
 	record, err := m.config.Storage.Get(ctx, req.IdempotencyKey)
 	if err != nil || record == nil {
 		// No record found or storage error - this is a new request
+		return nil, nil
+	}
+
+	// Check if record is expired
+	if !record.ExpiresAt.IsZero() && time.Now().After(record.ExpiresAt) {
+		_ = m.config.Storage.Delete(ctx, req.IdempotencyKey)
 		return nil, nil
 	}
 
