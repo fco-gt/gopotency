@@ -9,10 +9,10 @@
 *.test
 
 # Output of the go coverage tool
+coverage*
 *.out
-coverage
-coverage.txt
-coverage.html
+*.prof
+*-func.txt
 
 # Dependency directories
 vendor/
