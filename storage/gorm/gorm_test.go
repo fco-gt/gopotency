@@ -2,6 +2,7 @@ package gorm
 
 import (
 	"context"
+	"encoding/json"
 	"testing"
 	"time"
 
@@ -116,6 +117,47 @@ func TestGormStorage_CompleteFlow(t *testing.T) {
 		exists, _ := storage.Exists(ctx, key)
 		if exists {
 			t.Error("Record still exists after deletion")
+		}
+	})
+
+	// Sub-test: Edge Cases
+	t.Run("Get_NotFound", func(t *testing.T) {
+		got, err := storage.Get(ctx, "non-existent-key")
+		if err != nil {
+			t.Errorf("Expected nil error for non-existent key, got: %v", err)
+		}
+		if got != nil {
+			t.Error("Expected nil record for non-existent key")
+		}
+	})
+
+	t.Run("Get_Expired", func(t *testing.T) {
+		expKey := "expired-key"
+		expRecord := &idempotency.Record{
+			Key:       expKey,
+			Status:    idempotency.StatusCompleted,
+			CreatedAt: time.Now().Add(-2 * time.Hour),
+		}
+		// Manually create expired record in DB to bypass Set TTL logic
+		data, _ := json.Marshal(expRecord)
+		db.Create(&IdempotencyRecord{
+			Key:       expKey,
+			Data:      data,
+			ExpiresAt: time.Now().Add(-time.Hour),
+		})
+
+		got, err := storage.Get(ctx, expKey)
+		if err != nil {
+			t.Errorf("Expected nil error for expired key, got: %v", err)
+		}
+		if got != nil {
+			t.Error("Expected nil record because it should be deleted upon get")
+		}
+	})
+
+	t.Run("Close", func(t *testing.T) {
+		if err := storage.Close(); err != nil {
+			t.Errorf("expected nil error on close, got %v", err)
 		}
 	})
 }
