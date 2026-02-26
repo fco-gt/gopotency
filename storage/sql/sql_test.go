@@ -142,7 +142,27 @@ func TestSQLStorage(t *testing.T) {
 
 		_, err := storeLow.Get(ctx, "any")
 		if err == nil {
-			t.Error("Expected error for closed database")
+			t.Error("Expected error for closed database in Get")
+		}
+
+		err = storeLow.Set(ctx, &idempotency.Record{Key: "any"}, time.Hour)
+		if err == nil {
+			t.Error("Expected error for closed database in Set")
+		}
+
+		err = storeLow.Delete(ctx, "any")
+		if err == nil {
+			t.Error("Expected error for closed database in Delete")
+		}
+
+		_, err = storeLow.Exists(ctx, "any")
+		if err == nil {
+			t.Error("Expected error for closed database in Exists")
+		}
+
+		_, err = storeLow.TryLock(ctx, "any", time.Hour)
+		if err == nil {
+			t.Error("Expected error for closed database in TryLock")
 		}
 	})
 }
