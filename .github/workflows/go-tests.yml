@@ -25,8 +25,20 @@ jobs:
         run: go mod download
 
       - name: Run tests with race detector
-        run: go test -v -race ./...
+        run: go test -v -race -coverprofile=coverage.txt -covermode=atomic ./...
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          file: ./coverage.txt
+          fail_ci_if_error: false
 
       - name: Verify examples build
         run: |
-          go build -v ./examples/gin-basic/...
+          for example in examples/*/; do
+            if [ -d "$example" ]; then
+              echo "Building $example..."
+              go build -v "$example/..."
+            fi
+          done

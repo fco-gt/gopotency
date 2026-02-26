@@ -94,9 +94,16 @@ type Config struct {
     LockTimeout    time.Duration // Default: 5m
     KeyStrategy    KeyStrategy   // Default: HeaderBased("Idempotency-Key")
     AllowedMethods []string      // Default: ["POST", "PUT", "PATCH", "DELETE"]
+    RequireKey     bool          // If true, returns 400 if key is missing (Default: false)
     ErrorHandler   func(error) (int, any)
 }
 ```
+
+### Route-Specific Middleware
+
+GoPotency allows you to be granular. If you provide an `Idempotency-Key` in the request, the middleware will process it regardless of the method.
+
+For critical routes, you can enable `RequireKey: true` to ensure no one accidentally skips idempotency.
 
 ### Storage Backends
 

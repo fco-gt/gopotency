@@ -63,7 +63,7 @@ package idempotency
 
 const (
 	// Version is the package version
-	Version = "0.1.0"
+	Version = "1.0.0"
 
 	// DefaultHeaderName is the default header name for idempotency keys
 	DefaultHeaderName = "Idempotency-Key"
