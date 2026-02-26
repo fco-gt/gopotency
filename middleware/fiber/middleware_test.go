@@ -78,4 +78,34 @@ func TestFiberIdempotency(t *testing.T) {
 			t.Error("expected replay header")
 		}
 	})
+
+	t.Run("Conflict_InProgress", func(t *testing.T) {
+		store.Locks["fiber-conflict"] = true
+		req := httptest.NewRequest("POST", "/test", bytes.NewBuffer([]byte("data")))
+		req.Header.Set("Idempotency-Key", "fiber-conflict")
+		resp, _ := app.Test(req)
+
+		if resp.StatusCode != http.StatusConflict {
+			t.Errorf("expected 409, got %d", resp.StatusCode)
+		}
+	})
+
+	t.Run("RequireKey_Failure", func(t *testing.T) {
+		m2, _ := idempotency.NewManager(idempotency.Config{
+			Storage:    store,
+			RequireKey: true,
+		})
+		app2 := fiber.New()
+		app2.Use(Idempotency(m2))
+		app2.Post("/test", func(c *fiber.Ctx) error {
+			return c.SendString("ok")
+		})
+
+		req := httptest.NewRequest("POST", "/test", nil)
+		resp, _ := app2.Test(req)
+
+		if resp.StatusCode != http.StatusBadRequest {
+			t.Errorf("expected 400, got %d", resp.StatusCode)
+		}
+	})
 }

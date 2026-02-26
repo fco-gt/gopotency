@@ -99,6 +99,37 @@ func TestRedisStorage_CompleteFlow(t *testing.T) {
 		}
 	})
 
+	t.Run("Get_NilReturnOnNotFound", func(t *testing.T) {
+		got, err := storage.Get(ctx, "non-existent-key")
+		if err != nil {
+			t.Errorf("Expected nil error for non-existent key, got: %v", err)
+		}
+		if got != nil {
+			t.Errorf("Expected nil record for non-existent key, got: %v", got)
+		}
+	})
+
+	t.Run("Get_UnmarshalError", func(t *testing.T) {
+		// Setup bad data in redis manually
+		err := client.Set(ctx, "bad-json-key", "{invalid json}", time.Hour).Err()
+		if err != nil {
+			t.Fatalf("Failed to setup bad json: %v", err)
+		}
+
+		_, err = storage.Get(ctx, "bad-json-key")
+		if err == nil {
+			t.Error("Expected unmarshal error for invalid json, got nil")
+		}
+	})
+
+	t.Run("NewRedisStorage_ConnectionError", func(t *testing.T) {
+		// Try to connect to an invalid port to simulate connection failure
+		_, err := NewRedisStorage(ctx, "localhost:99999", "")
+		if err == nil {
+			t.Error("Expected error when connecting to invalid port, got nil")
+		}
+	})
+
 	// Sub-test: Closing the storage
 	t.Run("Close", func(t *testing.T) {
 		if err := storage.Close(); err != nil {

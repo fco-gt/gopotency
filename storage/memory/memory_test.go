@@ -87,4 +87,48 @@ func TestMemoryStorage_CompleteFlow(t *testing.T) {
 			t.Error("Record should have been deleted")
 		}
 	})
+
+	// Sub-test: Edge Cases
+	t.Run("Exists_Expired", func(t *testing.T) {
+		expKey := "memory-exp-key"
+		expRecord := &idempotency.Record{
+			Key:       expKey,
+			Status:    idempotency.StatusCompleted,
+			CreatedAt: time.Now().Add(-2 * time.Hour),
+		}
+		// Set it but it's immediately expired
+		_ = store.Set(ctx, expRecord, -time.Hour)
+
+		exists, _ := store.Exists(ctx, expKey)
+		if exists {
+			t.Error("Expired record should return false for Exists")
+		}
+	})
+
+	// Sub-test: Cleanup
+	t.Run("Cleanup", func(t *testing.T) {
+		cleanStore := NewMemoryStorage()
+
+		// Insert an expired record
+		cleanRecord := &idempotency.Record{
+			Key:       "cleanup-key",
+			Status:    idempotency.StatusCompleted,
+			CreatedAt: time.Now().Add(-2 * time.Hour),
+		}
+
+		_ = cleanStore.Set(ctx, cleanRecord, -time.Hour)
+
+		// TryLock with expiration in the past
+		_, _ = cleanStore.TryLock(ctx, "cleanup-lock", -time.Hour)
+
+		// Trigger cleanup cycle artificially if possible
+		// Since cleanup runs on a 1 min ticker, we can't easily trigger the ticker.
+		// However, we can just ensure that Exists, TryLock etc. correctly ignore expired items even if cleanup hasn't run.
+		exists, _ := cleanStore.Exists(ctx, "cleanup-key")
+		if exists {
+			t.Error("Expired record should not exist (pre-cleanup)")
+		}
+
+		cleanStore.Close()
+	})
 }
