@@ -1,4 +1,4 @@
-package gin
+package gin_test
 
 import (
 	"bytes"
@@ -10,54 +10,44 @@ import (
 	"time"
 
 	idempotency "github.com/fco-gt/gopotency"
-	"github.com/fco-gt/gopotency/storage/memory"
+	ginmw "github.com/fco-gt/gopotency/middleware/gin"
 	"github.com/gin-gonic/gin"
 )
 
-// localMockStorage mirrors the simple in-memory storage used in other middleware tests
-type localMockStorage struct {
+// MockStorage for Gin middleware testing
+type MockStorage struct {
 	Records map[string]*idempotency.Record
 	Locks   map[string]bool
 }
 
-func (m *localMockStorage) Get(ctx context.Context, key string) (*idempotency.Record, error) {
+func (m *MockStorage) Get(ctx context.Context, key string) (*idempotency.Record, error) {
 	return m.Records[key], nil
 }
-
-func (m *localMockStorage) Set(ctx context.Context, r *idempotency.Record, ttl time.Duration) error {
+func (m *MockStorage) Set(ctx context.Context, r *idempotency.Record, ttl time.Duration) error {
 	m.Records[r.Key] = r
 	return nil
 }
-
-func (m *localMockStorage) Delete(ctx context.Context, key string) error {
+func (m *MockStorage) Delete(ctx context.Context, key string) error {
 	delete(m.Records, key)
 	return nil
 }
-
-func (m *localMockStorage) Exists(ctx context.Context, key string) (bool, error) {
+func (m *MockStorage) Exists(ctx context.Context, key string) (bool, error) {
 	_, ok := m.Records[key]
 	return ok, nil
 }
-
-func (m *localMockStorage) TryLock(ctx context.Context, k string, t time.Duration) (bool, error) {
+func (m *MockStorage) TryLock(ctx context.Context, k string, t time.Duration) (bool, error) {
 	if m.Locks[k] {
 		return false, nil
 	}
 	m.Locks[k] = true
 	return true, nil
 }
+func (m *MockStorage) Unlock(ctx context.Context, key string) error { delete(m.Locks, key); return nil }
+func (m *MockStorage) Close() error                                 { return nil }
 
-func (m *localMockStorage) Unlock(ctx context.Context, key string) error {
-	delete(m.Locks, key)
-	return nil
-}
-
-func (m *localMockStorage) Close() error { return nil }
-
-func TestGinIdempotency_BasicReplay(t *testing.T) {
+func TestGinIdempotency(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-
-	store := &localMockStorage{
+	store := &MockStorage{
 		Records: make(map[string]*idempotency.Record),
 		Locks:   make(map[string]bool),
 	}
@@ -66,102 +56,88 @@ func TestGinIdempotency_BasicReplay(t *testing.T) {
 	})
 
 	r := gin.New()
-	r.Use(Idempotency(manager))
+	r.Use(ginmw.Idempotency(manager))
 
-	counter := 0
+	count := 0
 	r.POST("/test", func(c *gin.Context) {
-		counter++
-		c.JSON(http.StatusOK, gin.H{"count": counter})
+		count++
+		c.JSON(200, gin.H{"count": count})
 	})
 
-	body := []byte(`{"foo":"bar"}`)
-
-	// First request
-	req1, _ := http.NewRequest("POST", "/test", bytes.NewReader(body))
-	req1.Header.Set("Content-Type", "application/json")
-	req1.Header.Set("Idempotency-Key", "gin-key")
-	w1 := httptest.NewRecorder()
-	r.ServeHTTP(w1, req1)
-
-	if w1.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d", w1.Code)
-	}
-
-	// Second (replayed) request
-	req2, _ := http.NewRequest("POST", "/test", bytes.NewReader(body))
-	req2.Header.Set("Content-Type", "application/json")
-	req2.Header.Set("Idempotency-Key", "gin-key")
-	w2 := httptest.NewRecorder()
-	r.ServeHTTP(w2, req2)
-
-	if w2.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d", w2.Code)
-	}
-	if w2.Header().Get("X-Idempotent-Replayed") != "true" {
-		t.Fatalf("expected X-Idempotent-Replayed header to be true")
-	}
-
-	var resp map[string]int
-	if err := json.Unmarshal(w2.Body.Bytes(), &resp); err != nil {
-		t.Fatalf("failed to unmarshal response: %v", err)
-	}
-	if resp["count"] != 1 {
-		t.Fatalf("expected handler to run once, count=1, got %d", resp["count"])
-	}
-}
-
-func TestGinIdempotency_RequireKeyAndConflict(t *testing.T) {
-	gin.SetMode(gin.TestMode)
-
-	t.Run("RequireKey should reject missing key", func(t *testing.T) {
-		store := memory.NewMemoryStorage()
-		manager, _ := idempotency.NewManager(idempotency.Config{
-			Storage:        store,
-			AllowedMethods: []string{"POST"},
-			RequireKey:     true,
-		})
-
-		r := gin.New()
-		r.Use(Idempotency(manager))
-		r.POST("/critical", func(c *gin.Context) {
-			c.Status(http.StatusOK)
-		})
-
-		req, _ := http.NewRequest("POST", "/critical", bytes.NewReader([]byte(`{}`)))
+	t.Run("FirstRequest", func(t *testing.T) {
+		req, _ := http.NewRequest("POST", "/test", bytes.NewBuffer([]byte("data")))
+		req.Header.Set("Idempotency-Key", "gin-key")
 		w := httptest.NewRecorder()
 		r.ServeHTTP(w, req)
 
-		if w.Code != http.StatusBadRequest {
-			t.Fatalf("expected 400, got %d", w.Code)
+		if w.Code != http.StatusOK {
+			t.Errorf("expected 200, got %d", w.Code)
 		}
 	})
 
-	t.Run("Lock conflict returns 409", func(t *testing.T) {
-		store := &localMockStorage{
-			Records: make(map[string]*idempotency.Record),
-			Locks:   make(map[string]bool),
+	t.Run("ReplayRequest", func(t *testing.T) {
+		req, _ := http.NewRequest("POST", "/test", bytes.NewBuffer([]byte("data")))
+		req.Header.Set("Idempotency-Key", "gin-key")
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		if w.Header().Get("X-Idempotent-Replayed") != "true" {
+			t.Error("expected replay header")
 		}
-		manager, _ := idempotency.NewManager(idempotency.Config{
-			Storage: store,
-		})
 
-		r := gin.New()
-		r.Use(Idempotency(manager))
-		r.POST("/lock", func(c *gin.Context) {
-			c.Status(http.StatusOK)
-		})
+		var resp map[string]int
+		json.Unmarshal(w.Body.Bytes(), &resp)
+		if resp["count"] != 1 {
+			t.Errorf("expected count 1, got %d", resp["count"])
+		}
+	})
 
-		// Pre-mark the lock as held so TryLock fails
-		store.Locks["conflict-key"] = true
-
-		req, _ := http.NewRequest("POST", "/lock", bytes.NewReader([]byte(`payload`)))
-		req.Header.Set("Idempotency-Key", "conflict-key")
+	t.Run("Conflict_InProgress", func(t *testing.T) {
+		store.Locks["gin-conflict"] = true
+		req, _ := http.NewRequest("POST", "/test", bytes.NewBuffer([]byte("data")))
+		req.Header.Set("Idempotency-Key", "gin-conflict")
 		w := httptest.NewRecorder()
 		r.ServeHTTP(w, req)
 
 		if w.Code != http.StatusConflict {
-			t.Fatalf("expected 409 Conflict, got %d", w.Code)
+			t.Errorf("expected 409, got %d", w.Code)
+		}
+	})
+
+	t.Run("RequireKey_Failure", func(t *testing.T) {
+		m2, _ := idempotency.NewManager(idempotency.Config{
+			Storage:    store,
+			RequireKey: true,
+		})
+		r2 := gin.New()
+		r2.Use(ginmw.Idempotency(m2))
+		r2.POST("/test", func(c *gin.Context) {
+			c.Status(200)
+		})
+
+		req, _ := http.NewRequest("POST", "/test", nil)
+		w := httptest.NewRecorder()
+		r2.ServeHTTP(w, req)
+
+		if w.Code != http.StatusBadRequest {
+			t.Errorf("expected 400, got %d", w.Code)
+		}
+	})
+
+	t.Run("WriteString", func(t *testing.T) {
+		r3 := gin.New()
+		r3.Use(ginmw.Idempotency(manager))
+		r3.POST("/test", func(c *gin.Context) {
+			_, _ = c.Writer.WriteString("hello string")
+		})
+
+		req, _ := http.NewRequest("POST", "/test", nil)
+		req.Header.Set("Idempotency-Key", "gin-string-key")
+		w := httptest.NewRecorder()
+		r3.ServeHTTP(w, req)
+
+		if w.Body.String() != "hello string" {
+			t.Errorf("expected body 'hello string', got '%s'", w.Body.String())
 		}
 	})
 }
-
