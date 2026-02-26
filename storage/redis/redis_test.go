@@ -98,4 +98,11 @@ func TestRedisStorage_CompleteFlow(t *testing.T) {
 			t.Error("Data leakage: record still exists after deletion")
 		}
 	})
+
+	// Sub-test: Closing the storage
+	t.Run("Close", func(t *testing.T) {
+		if err := storage.Close(); err != nil {
+			t.Errorf("expected nil error on close, got %v", err)
+		}
+	})
 }
