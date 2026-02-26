@@ -45,6 +45,11 @@ type Config struct {
 
 	// OnLockConflict is called when a request is already in progress (optional)
 	OnLockConflict func(key string)
+
+	// RequireKey if true, the middleware will return an error if the idempotency key is missing
+	// for an allowed method/route.
+	// Default: false
+	RequireKey bool
 }
 
 // setDefaults sets default values for unspecified config options

@@ -16,49 +16,60 @@ func Idempotency(manager *idempotency.Manager) echo.MiddlewareFunc {
 		return func(c echo.Context) error {
 			req := c.Request()
 
-			// Skip if method is not allowed
-			if !manager.IsMethodAllowed(req.Method) {
+			// 1. Extract potential idempotency key from header
+			headerKey := req.Header.Get("Idempotency-Key")
+
+			// 2. Build dummy request for potential auto-generation
+			pReq := &idempotency.Request{
+				Method:         req.Method,
+				Path:           req.URL.Path,
+				Headers:        req.Header,
+				IdempotencyKey: headerKey,
+			}
+
+			// 3. Determine if we should apply idempotency
+			isMethodAllowed := manager.IsMethodAllowed(req.Method)
+			hasKey := headerKey != ""
+
+			// If no header key and method not allowed, skip early
+			if !hasKey && !isMethodAllowed {
 				return next(c)
 			}
 
-			// Read body
-			body, err := io.ReadAll(req.Body)
-			if err != nil {
-				return echo.NewHTTPError(http.StatusBadRequest, "failed to read request body")
+			// 4. Handle Request Body
+			var body []byte
+			if req.Body != nil {
+				var err error
+				body, err = io.ReadAll(req.Body)
+				if err != nil {
+					return echo.NewHTTPError(http.StatusBadRequest, "failed to read request body")
+				}
+				req.Body.Close()
+				req.Body = io.NopCloser(bytes.NewBuffer(body))
 			}
+			pReq.Body = body
 
-			// Restore body for downstream handlers
-			req.Body = io.NopCloser(bytes.NewBuffer(body))
-
-			// Build request object
-			pReq := &idempotency.Request{
-				Method:  req.Method,
-				Path:    req.URL.Path,
-				Headers: req.Header,
-				Body:    body,
-			}
-
-			// Extract idempotency key from header if present
-			if key := req.Header.Get("Idempotency-Key"); key != "" {
-				pReq.IdempotencyKey = key
-			}
-
-			// Check for cached response
+			// 5. Check for cached response
 			cachedResp, err := manager.Check(req.Context(), pReq)
 			if err != nil {
 				if err == idempotency.ErrRequestInProgress {
-					return echo.NewHTTPError(http.StatusConflict, "request with this idempotency key is already being processed")
+					return echo.NewHTTPError(http.StatusConflict, "request already in progress")
 				}
-
 				if err == idempotency.ErrRequestMismatch {
-					return echo.NewHTTPError(http.StatusUnprocessableEntity, "request with same idempotency key has different content")
+					return echo.NewHTTPError(http.StatusUnprocessableEntity, "idempotency key reused with different payload")
 				}
+				// Other errors proceed normally
+			}
 
-				// Other errors, proceed without idempotency
+			// 6. Missing Key Handling (RequireKey check)
+			if pReq.IdempotencyKey == "" {
+				if manager.Config().RequireKey && isMethodAllowed {
+					return echo.NewHTTPError(http.StatusBadRequest, "idempotency key is required for this request")
+				}
 				return next(c)
 			}
 
-			// Return cached response if available
+			// 7. Return cached response if available
 			if cachedResp != nil {
 				for key, values := range cachedResp.Headers {
 					for _, value := range values {
@@ -69,30 +80,27 @@ func Idempotency(manager *idempotency.Manager) echo.MiddlewareFunc {
 				return c.Blob(cachedResp.StatusCode, cachedResp.ContentType, cachedResp.Body)
 			}
 
-			// Acquire lock if we have an idempotency key
-			if pReq.IdempotencyKey != "" {
-				if err := manager.Lock(req.Context(), pReq); err != nil {
-					if err == idempotency.ErrRequestInProgress {
-						return echo.NewHTTPError(http.StatusConflict, "request with this idempotency key is already being processed")
-					}
-					// Other errors, proceed without idempotency
+			// 8. Acquire lock
+			if err := manager.Lock(req.Context(), pReq); err != nil {
+				if err == idempotency.ErrRequestInProgress {
+					return echo.NewHTTPError(http.StatusConflict, "request already in progress")
 				}
 			}
 
-			// Capture response
+			// 9. Capture response
 			res := c.Response()
 			originalWriter := res.Writer
 			bodyBuffer := &bytes.Buffer{}
 			mw := io.MultiWriter(originalWriter, bodyBuffer)
 			res.Writer = &responseWriter{Writer: mw, ResponseWriter: originalWriter}
 
-			// Process request
+			// 10. Process request
 			err = next(c)
 
 			// Restore original writer
 			res.Writer = originalWriter
 
-			// Store response if we have an idempotency key and processing succeeded
+			// 11. Store response
 			if pReq.IdempotencyKey != "" && res.Status < 500 {
 				resp := &idempotency.Response{
 					StatusCode:  res.Status,
@@ -100,10 +108,8 @@ func Idempotency(manager *idempotency.Manager) echo.MiddlewareFunc {
 					Body:        bodyBuffer.Bytes(),
 					ContentType: res.Header().Get("Content-Type"),
 				}
-
 				_ = manager.Store(req.Context(), pReq.IdempotencyKey, resp)
 			} else if pReq.IdempotencyKey != "" {
-				// Unlock on error
 				_ = manager.Unlock(req.Context(), pReq.IdempotencyKey)
 			}
 

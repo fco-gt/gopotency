@@ -11,6 +11,11 @@ type Manager struct {
 	config Config
 }
 
+// Config returns the manager's configuration (read-only)
+func (m *Manager) Config() Config {
+	return m.config
+}
+
 // NewManager creates a new idempotency manager with the given configuration
 func NewManager(config Config) (*Manager, error) {
 	// Set defaults

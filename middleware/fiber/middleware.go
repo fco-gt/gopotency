@@ -11,17 +11,16 @@ import (
 // Idempotency returns a Fiber middleware that handles idempotency
 func Idempotency(manager *idempotency.Manager) fiber.Handler {
 	return func(c *fiber.Ctx) error {
-		// Skip if method is not allowed
-		if !manager.IsMethodAllowed(c.Method()) {
-			return c.Next()
-		}
+		// 1. Extract potential idempotency key from header
+		headerKey := c.Get("Idempotency-Key")
 
-		// Build request object
+		// 2. Build dummy request
 		pReq := &idempotency.Request{
-			Method:  c.Method(),
-			Path:    c.Path(),
-			Headers: make(map[string][]string),
-			Body:    c.Body(),
+			Method:         c.Method(),
+			Path:           c.Path(),
+			Headers:        make(map[string][]string),
+			Body:           c.Body(),
+			IdempotencyKey: headerKey,
 		}
 
 		// Copy headers
@@ -30,31 +29,36 @@ func Idempotency(manager *idempotency.Manager) fiber.Handler {
 			pReq.Headers[k] = append(pReq.Headers[k], string(value))
 		})
 
-		// Extract idempotency key from header if present
-		if key := c.Get("Idempotency-Key"); key != "" {
-			pReq.IdempotencyKey = key
-		}
+		// 3. Determine if we should apply idempotency
+		isMethodAllowed := manager.IsMethodAllowed(c.Method())
+		hasKey := headerKey != ""
 
-		// Check for cached response
-		cachedResp, err := manager.Check(c.Context(), pReq)
-		if err != nil {
-			if err == idempotency.ErrRequestInProgress {
-				return c.Status(http.StatusConflict).JSON(fiber.Map{
-					"error": "request with this idempotency key is already being processed",
-				})
-			}
-
-			if err == idempotency.ErrRequestMismatch {
-				return c.Status(http.StatusUnprocessableEntity).JSON(fiber.Map{
-					"error": "request with same idempotency key has different content",
-				})
-			}
-
-			// Other errors, proceed without idempotency
+		// If no header key and method not allowed, skip early
+		if !hasKey && !isMethodAllowed {
 			return c.Next()
 		}
 
-		// Return cached response if available
+		// 4. Check for cached response
+		cachedResp, err := manager.Check(c.Context(), pReq)
+		if err != nil {
+			if err == idempotency.ErrRequestInProgress {
+				return c.Status(http.StatusConflict).JSON(fiber.Map{"error": "request already in progress"})
+			}
+			if err == idempotency.ErrRequestMismatch {
+				return c.Status(http.StatusUnprocessableEntity).JSON(fiber.Map{"error": "idempotency key reused with different payload"})
+			}
+			// Other errors proceed normally
+		}
+
+		// 5. Missing Key Handling (RequireKey check)
+		if pReq.IdempotencyKey == "" {
+			if manager.Config().RequireKey && isMethodAllowed {
+				return c.Status(http.StatusBadRequest).JSON(fiber.Map{"error": "idempotency key is required for this request"})
+			}
+			return c.Next()
+		}
+
+		// 6. Return cached response if available
 		if cachedResp != nil {
 			for key, values := range cachedResp.Headers {
 				for _, value := range values {
@@ -69,22 +73,17 @@ func Idempotency(manager *idempotency.Manager) fiber.Handler {
 			return c.Send(cachedResp.Body)
 		}
 
-		// Acquire lock if we have an idempotency key
-		if pReq.IdempotencyKey != "" {
-			if err := manager.Lock(c.Context(), pReq); err != nil {
-				if err == idempotency.ErrRequestInProgress {
-					return c.Status(http.StatusConflict).JSON(fiber.Map{
-						"error": "request with this idempotency key is already being processed",
-					})
-				}
-				// Other errors, proceed without idempotency
+		// 7. Acquire lock
+		if err := manager.Lock(c.Context(), pReq); err != nil {
+			if err == idempotency.ErrRequestInProgress {
+				return c.Status(http.StatusConflict).JSON(fiber.Map{"error": "request already in progress"})
 			}
 		}
 
-		// Process request
+		// 8. Process request
 		err = c.Next()
 
-		// Store response if we have an idempotency key and processing succeeded
+		// 9. Store response
 		if pReq.IdempotencyKey != "" && c.Response().StatusCode() < 500 {
 			headers := make(map[string][]string)
 			c.Response().Header.VisitAll(func(key, value []byte) {
@@ -98,10 +97,8 @@ func Idempotency(manager *idempotency.Manager) fiber.Handler {
 				Body:        c.Response().Body(),
 				ContentType: string(c.Response().Header.Peek(fiber.HeaderContentType)),
 			}
-
 			_ = manager.Store(c.Context(), pReq.IdempotencyKey, resp)
 		} else if pReq.IdempotencyKey != "" {
-			// Unlock on error
 			_ = manager.Unlock(c.Context(), pReq.IdempotencyKey)
 		}
 
